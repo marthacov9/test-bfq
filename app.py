@@ -17,10 +17,10 @@ col1, col2 = st.columns(2)
 with col1:
     nombre = st.text_input("Nombre completo")
     ocupacion = st.text_input("Ocupación")
-    municipio = st.text_input("Municipio / Ciudad")
+    genero = st.selectbox("Género", ["Masculino", "Femenino", "Otro"])
 with col2:
     edad = st.number_input("Edad", min_value=10, max_value=100, value=25)
-    genero = st.selectbox("Género", ["Masculino", "Femenino", "Otro"])
+    municipio = st.text_input("Municipio / Ciudad")
     fecha = st.date_input("Fecha")
 
 st.markdown("---")
@@ -37,6 +37,7 @@ def cargar_preguntas():
     preguntas = []
     for i in range(len(df)):
         val_col1 = str(df.iloc[i, 1])  # Columna B (índice 1)
+        # Validar si es una pregunta P1, P2... P132
         if val_col1.startswith("P") and any(
             char.isdigit() for char in val_col1
         ):
@@ -86,23 +87,37 @@ if lista_preguntas:
                     wb = openpyxl.load_workbook("BFQ.xlsx")
                     ws = wb["Hoja 1"]
 
-                    # Asignar datos personales en las celdas correspondientes de tu Excel
-                    ws["C4"] = nombre
-                    ws["C5"] = ocupacion
-                    ws["C6"] = genero
-                    ws["E5"] = str(fecha)
-                    ws["G5"] = municipio
-                    ws["F6"] = edad
+                    # Asignar datos personales en las celdas exactas de tu Excel
+                    ws["B5"] = nombre
+                    ws["B6"] = ocupacion
+                    ws["D7"] = str(fecha)
+                    ws["F7"] = municipio
+                    ws["B8"] = genero
+                    ws["F8"] = edad
 
                     # Inyectar las respuestas del usuario en el Excel
-                    # (Dependiendo de cómo tengas estructuradas las celdas de respuesta en tu Hoja 1,
-                    # openpyxl actualizará automáticamente las fórmulas de la Hoja 2)
                     for p in lista_preguntas:
-                        row_idx = p["row"] + 1  # Ajuste de índice de fila en openpyxl
+                        row_idx = (
+                            p["row"] + 1
+                        )  # Fila exacta de la pregunta en openpyxl
                         val_elegido = respuestas[p["id"]]
-                        # Aquí puedes asignar el valor directamente a la celda de respuesta correspondiente de la fila.
-                        # Por ejemplo, si la respuesta numérica se coloca en una celda específica al lado de la pregunta:
-                        # ws.cell(row=row_idx, column=4).value = val_elegido
+
+                        # Mapear la selección (5 a 1) a la columna correspondiente (C=5, D=4, E=3, F=2, G=1)
+                        # Limpiamos primero las opciones de esa fila (columnas 3 a 7)
+                        for col_c in range(3, 8):
+                            ws.cell(
+                                row=row_idx + 4, column=col_c
+                            ).value = (
+                                None  # Fila de opciones suele estar 4 filas abajo de la pregunta
+                            )
+
+                        # Dependiendo del valor elegido, ponemos una "X" o el valor en la columna respectiva
+                        col_map = {5: 3, 4: 4, 3: 5, 2: 6, 1: 7}
+                        target_col = col_map.get(val_elegido)
+                        if target_col:
+                            ws.cell(
+                                row=row_idx + 4, column=target_col
+                            ).value = "X"
 
                     # Guardar el archivo procesado conservando todas las fórmulas y cálculos de la Hoja 2
                     output_path = f"Informe_BFQ_{nombre.replace(' ', '_')}.xlsx"
