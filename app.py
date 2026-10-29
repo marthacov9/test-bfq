@@ -1,3 +1,8 @@
+from email import encoders
+from email.mime.base import MIMEBase
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+import smtplib
 import openpyxl
 import pandas as pd
 import streamlit as st
@@ -23,6 +28,11 @@ with col2:
     municipio = st.text_input("Municipio / Ciudad")
     fecha = st.date_input("Fecha")
 
+# Campo obligatorio para el correo de contacto o el tuyo institucional
+correo_destino = st.text_input(
+    "Correo electrónico (para recibir tus resultados o de contacto)"
+)
+
 st.markdown("---")
 st.subheader("Instrucciones")
 st.write(
@@ -37,7 +47,6 @@ def cargar_preguntas():
     preguntas = []
     for i in range(len(df)):
         val_col1 = str(df.iloc[i, 1])  # Columna B (índice 1)
-        # Validar si es una pregunta P1, P2... P132
         if val_col1.startswith("P") and any(
             char.isdigit() for char in val_col1
         ):
@@ -76,67 +85,84 @@ if lista_preguntas:
             )
             st.write("")
 
-        submitted = st.form_submit_button("Enviar y Calcular Resultados")
+        submitted = st.form_submit_button("Enviar y Procesar Resultados")
 
-        if submitted:
-            if not nombre:
-                st.warning("Por favor ingresa al menos tu nombre antes de enviar.")
-            else:
-                try:
-                    # Abrir el Excel con openpyxl preservando todas las fórmulas de la Hoja 2
-                    wb = openpyxl.load_workbook("BFQ.xlsx")
-                    ws = wb["Hoja 1"]
+    if submitted:
+        if not nombre or not correo_destino:
+            st.warning(
+                "Por favor ingresa tu nombre y tu correo electrónico antes de enviar."
+            )
+        else:
+            try:
+                # Abrir el Excel con openpyxl preservando todas las fórmulas de la Hoja 2
+                wb = openpyxl.load_workbook("BFQ.xlsx")
+                ws = wb["Hoja 1"]
 
-                    # Asignar datos personales en las celdas exactas de tu Excel
-                    ws["B5"] = nombre
-                    ws["B6"] = ocupacion
-                    ws["D7"] = str(fecha)
-                    ws["F7"] = municipio
-                    ws["B8"] = genero
-                    ws["F8"] = edad
+                # Asignar datos personales en las celdas exactas de tu Excel
+                ws["B5"] = nombre
+                ws["B6"] = ocupacion
+                ws["D7"] = str(fecha)
+                ws["F7"] = municipio
+                ws["B8"] = genero
+                ws["F8"] = edad
 
-                    # Inyectar las respuestas del usuario en el Excel
-                    for p in lista_preguntas:
-                        row_idx = (
-                            p["row"] + 1
-                        )  # Fila exacta de la pregunta en openpyxl
-                        val_elegido = respuestas[p["id"]]
+                # Inyectar las respuestas del usuario en el Excel
+                for p in lista_preguntas:
+                    row_idx = p["row"] + 1
+                    val_elegido = st.session_state[p["id"]]
 
-                        # Mapear la selección (5 a 1) a la columna correspondiente (C=5, D=4, E=3, F=2, G=1)
-                        # Limpiamos primero las opciones de esa fila (columnas 3 a 7)
-                        for col_c in range(3, 8):
-                            ws.cell(
-                                row=row_idx + 4, column=col_c
-                            ).value = (
-                                None  # Fila de opciones suele estar 4 filas abajo de la pregunta
-                            )
+                    for col_c in range(3, 8):
+                        ws.cell(row=row_idx + 4, column=col_c).value = None
 
-                        # Dependiendo del valor elegido, ponemos una "X" o el valor en la columna respectiva
-                        col_map = {5: 3, 4: 4, 3: 5, 2: 6, 1: 7}
-                        target_col = col_map.get(val_elegido)
-                        if target_col:
-                            ws.cell(
-                                row=row_idx + 4, column=target_col
-                            ).value = "X"
+                    col_map = {5: 3, 4: 4, 3: 5, 2: 6, 1: 7}
+                    target_col = col_map.get(val_elegido)
+                    if target_col:
+                        ws.cell(row=row_idx + 4, column=target_col).value = "X"
 
-                    # Guardar el archivo procesado conservando todas las fórmulas y cálculos de la Hoja 2
-                    output_path = f"Informe_BFQ_{nombre.replace(' ', '_')}.xlsx"
-                    wb.save(output_path)
+                # Guardar temporalmente el archivo procesado en el servidor
+                output_path = f"Informe_BFQ_{nombre.replace(' ', '_')}.xlsx"
+                wb.save(output_path)
 
-                    st.success(
-                        "¡Cuestionario respondido y procesado con éxito por el motor de tu Excel!"
-                    )
-                    st.balloons()
+                # --- CONFIGURACIÓN DE ENVÍO POR CORREO ---
+                # NOTA: Debes configurar tu correo y contraseña de aplicación en Streamlit Secrets o reemplazarlos aquí temporalmente
+                remitente = st.secrets.get("EMAIL_USER", "tu_correo@gmail.com")
+                password = st.secrets.get("EMAIL_PASS", "tu_contraseña_de_aplicacion")
 
-                    with open(output_path, "rb") as f:
-                        st.download_button(
-                            label="📥 Descargar tu Informe Completo en Excel (con Perfil Calculado)",
-                            data=f,
-                            file_name=output_path,
-                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        )
+                msg = MIMEMultipart()
+                msg["From"] = remitente
+                # Puedes enviarlo al correo que ingresó el usuario o a tu propio correo institucional
+                msg["To"] = correo_destino
+                msg["Subject"] = (
+                    f"Nuevo Resultado Cuestionario Big Five - {nombre}"
+                )
 
-                except Exception as e:
-                    st.error(
-                        f"Ocurrió un error al procesar el archivo en Excel: {e}"
-                    )
+                cuerpo = f"Hola,\n\nSe ha completado un nuevo cuestionario de Big Five.\n\nDatos del Evaluado:\n- Nombre: {nombre}\n- Ocupación: {ocupacion}\n- Edad: {edad}\n- Municipio: {municipio}\n\nAdjunto encontrarás el archivo de Excel con el perfil calculado."
+                msg.attach(MIMEText(cuerpo, "plain"))
+
+                # Adjuntar el archivo Excel
+                with open(output_path, "openpyxl" if False else output_path, "rb") as attachment:
+                    part = MIMEBase("application", "octet-stream")
+                    part.set_payload(attachment.read())
+                encoders.encode_base64(part)
+                part.add_header(
+                    "Content-Disposition",
+                    f"attachment; filename= {output_path}",
+                )
+                msg.attach(part)
+
+                # Conectar al servidor SMTP de Gmail (puedes ajustarlo si usas otro servicio)
+                server = smtplib.SMTP("smtp.gmail.com", 587)
+                server.starttls()
+                server.login(remitente, password)
+                server.sendmail(remitente, correo_destino, msg.as_string())
+                server.quit()
+
+                st.success(
+                    "¡Cuestionario enviado con éxito! Los resultados han sido procesados y enviados a tu correo."
+                )
+                st.balloons()
+
+            except Exception as e:
+                st.error(
+                    f"Ocurrió un error al procesar o enviar el correo (verifica tus credenciales de correo): {e}"
+                )
