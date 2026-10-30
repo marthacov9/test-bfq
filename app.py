@@ -124,25 +124,35 @@ if lista_preguntas:
                 wb.save(output_path)
 
                 # --- CONFIGURACIÓN DE ENVÍO POR CORREO ---
-                # NOTA: Debes configurar tu correo y contraseña de aplicación en Streamlit Secrets o reemplazarlos aquí temporalmente
-                remitente = st.secrets.get("EMAIL_USER", "tu_correo@gmail.com")
-                password = st.secrets.get("EMAIL_PASS", "tu_contraseña_de_aplicacion")
+                remitente = st.secrets["email"]["remitente"]
+                password = st.secrets["email"]["password_app"]
+                
+                # CORREO DESTINO: 
+                # Apunta a tu correo fijo de administración configurado en los secrets
+                correo_receptor = st.secrets["email"]["correo_destino"]
 
                 msg = MIMEMultipart()
                 msg["From"] = remitente
-                # Puedes enviarlo al correo que ingresó el usuario o a tu propio correo institucional
-                msg["To"] = correo_destino
-                msg["Subject"] = (
-                    f"Nuevo Resultado Cuestionario Big Five - {nombre}"
-                )
+                msg["To"] = correo_receptor
+                msg["Subject"] = f"Nuevo Resultado Cuestionario Big Five - {nombre}"
 
-                cuerpo = f"Hola,\n\nSe ha completado un nuevo cuestionario de Big Five.\n\nDatos del Evaluado:\n- Nombre: {nombre}\n- Ocupación: {ocupacion}\n- Edad: {edad}\n- Municipio: {municipio}\n\nAdjunto encontrarás el archivo de Excel con el perfil calculado."
+                cuerpo = (
+                    f"Hola,\n\nSe ha completado un nuevo cuestionario de Big Five.\n\n"
+                    f"Datos del Evaluado:\n"
+                    f"- Nombre: {nombre}\n"
+                    f"- Ocupación: {ocupacion}\n"
+                    f"- Edad: {edad}\n"
+                    f"- Municipio: {municipio}\n"
+                    f"- Correo de contacto: {correo_destino}\n\n"
+                    f"Adjunto encontrarás el archivo de Excel con el perfil calculado."
+                )
                 msg.attach(MIMEText(cuerpo, "plain"))
 
-                # Adjuntar el archivo Excel
-                with open(output_path, "openpyxl" if False else output_path, "rb") as attachment:
+                # Adjuntar el archivo Excel (Error de sintaxis corregido correctamente)
+                with open(output_path, "rb") as attachment:
                     part = MIMEBase("application", "octet-stream")
                     part.set_payload(attachment.read())
+                
                 encoders.encode_base64(part)
                 part.add_header(
                     "Content-Disposition",
@@ -150,15 +160,15 @@ if lista_preguntas:
                 )
                 msg.attach(part)
 
-                # Conectar al servidor SMTP de Gmail (puedes ajustarlo si usas otro servicio)
+                # Conectar al servidor SMTP de Gmail y enviar
                 server = smtplib.SMTP("smtp.gmail.com", 587)
                 server.starttls()
                 server.login(remitente, password)
-                server.sendmail(remitente, correo_destino, msg.as_string())
+                server.sendmail(remitente, correo_receptor, msg.as_string())
                 server.quit()
 
                 st.success(
-                    "¡Cuestionario enviado con éxito! Los resultados han sido procesados y enviados a tu correo."
+                    "¡Cuestionario enviado con éxito! Los resultados han sido procesados y enviados por correo."
                 )
                 st.balloons()
 
