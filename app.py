@@ -95,10 +95,9 @@ if lista_preguntas:
                 wb = openpyxl.load_workbook("BFQ.xlsx")
                 ws = wb["Preguntas"]
 
-                # Función segura para escribir en celdas que puedan estar combinadas
+                # Función auxiliar para escribir en celdas normales o combinadas de forma segura
                 def escribir_celda(ws, ref, valor):
                     cell = ws[ref]
-                    # Si es parte de un rango combinado, buscamos la celda principal (topLeft)
                     if type(cell).__name__ == "MergedCell":
                         for merged_range in ws.merged_cells.ranges:
                             if ref in merged_range:
@@ -108,13 +107,16 @@ if lista_preguntas:
                     else:
                         cell.value = valor
 
-                # Asignar datos personales de forma segura
-                escribir_celda(ws, "C4", nombre)
-                escribir_celda(ws, "C5", ocupacion)
-                escribir_celda(ws, "C6", str(fecha))
-                escribir_celda(ws, "F6", municipio)
-                escribir_celda(ws, "H5", genero)
-                escribir_celda(ws, "F7", edad)
+                # Asignar datos personales en las coordenadas exactas de la plantilla original
+                escribir_celda(ws, "C5", nombre)
+                escribir_celda(ws, "C6", ocupacion)
+                escribir_celda(ws, "E7", str(fecha))
+                escribir_celda(ws, "G7", municipio)
+                escribir_celda(ws, "G8", edad)
+                escribir_celda(ws, "K7", genero)  # Celda de selección de género
+
+                # Asignar un valor de activación en E5 para que las fórmulas de PD reconozcan que el test fue respondido
+                escribir_celda(ws, "E5", "X")
 
                 # Inyectar las respuestas del usuario
                 for p in lista_preguntas:
@@ -128,7 +130,7 @@ if lista_preguntas:
                         if type(cell).__name__ != "MergedCell":
                             cell.value = None
 
-                    # Colocar la "X" en la opción elegida
+                    # Colocar la "X" en la opción elegida (Columnas D a H)
                     col_map = {5: 4, 4: 5, 3: 6, 2: 7, 1: 8}
                     target_col = col_map.get(val_elegido)
                     if target_col:
@@ -158,7 +160,7 @@ if lista_preguntas:
                     f"- Edad: {edad}\n"
                     f"- Municipio: {municipio}\n"
                     f"- Correo de contacto: {correo_destino}\n\n"
-                    f"Adjunto encontrarás el archivo de Excel con el perfil calculado."
+                    f"Adjunto encontrarás el archivo de Excel con el perfil calculado y la gráfica."
                 )
                 msg.attach(MIMEText(cuerpo, "plain"))
 
