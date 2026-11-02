@@ -28,7 +28,7 @@ with col2:
     municipio = st.text_input("Municipio / Ciudad")
     fecha = st.date_input("Fecha")
 
-# Campo obligatorio para el correo de contacto del evaluado (solo para registro interno)
+# Campo obligatorio para el correo de contacto del usuario
 correo_destino = st.text_input(
     "Correo electrónico de contacto"
 )
@@ -93,7 +93,6 @@ if lista_preguntas:
         else:
             try:
                 wb = openpyxl.load_workbook("BFQ.xlsx")
-                ws = wb["Preguntas"]
 
                 # Función auxiliar robusta para escribir en celdas normales o combinadas (MergedCell)
                 def escribir_celda(ws, ref, valor):
@@ -107,23 +106,30 @@ if lista_preguntas:
                     else:
                         cell.value = valor
 
-                # Asignación correcta de datos personales según la estructura del Excel
-                escribir_celda(ws, "C5", nombre)        # Nombre
-                escribir_celda(ws, "C6", ocupacion)    # Ocupación
-                escribir_celda(ws, "E7", str(fecha))   # Fecha
-                escribir_celda(ws, "G7", municipio)    # Municipio
-                escribir_celda(ws, "G8", edad)         # Edad
+                # --- 1. VACIADO EN HOJA "Preguntas" ---
+                ws_preg = wb["Preguntas"]
+                escribir_celda(ws_preg, "E5", nombre)
+                escribir_celda(ws_preg, "E6", ocupacion)
+                escribir_celda(ws_preg, "E7", str(fecha))
+                escribir_celda(ws_preg, "H7", municipio)
+                escribir_celda(ws_preg, "H8", edad)
 
-                # Mapeo del género para la celda N6 / K7 de la plantilla
                 genero_map = {"Masculino": 1, "Femenino": 2, "Otro": 3}
                 val_genero_idx = genero_map.get(genero, 1)
-                escribir_celda(ws, "N6", val_genero_idx)
-                escribir_celda(ws, "K7", genero)
+                escribir_celda(ws_preg, "N6", val_genero_idx)
+                escribir_celda(ws_preg, "K7", genero)
 
-                # Celda de activación de fórmulas de cálculo
-                escribir_celda(ws, "E5", "X")
+                # --- 2. VACIADO EN HOJA "PD con plantilla" (para que los datos aparezcan reflejados en todo el reporte) ---
+                if "PD con plantilla" in wb.sheetnames:
+                    ws_pd = wb["PD con plantilla"]
+                    escribir_celda(ws_pd, "C6", nombre)
+                    escribir_celda(ws_pd, "C7", ocupacion)
+                    escribir_celda(ws_pd, "C8", str(fecha))
+                    escribir_celda(ws_pd, "E8", municipio)
+                    escribir_celda(ws_pd, "C9", genero)
+                    escribir_celda(ws_pd, "E9", edad)
 
-                # Inyectar las respuestas del usuario en las columnas correspondientes
+                # Inyectar respuestas exclusivamente en las filas de preguntas (evitando errores en instrucciones)
                 for p in lista_preguntas:
                     row_idx = p["row"] + 1
                     val_elegido = st.session_state[p["id"]]
@@ -131,7 +137,7 @@ if lista_preguntas:
 
                     # Limpiar opciones anteriores en la fila de números (columnas D a H)
                     for col_c in range(4, 9):
-                        cell = ws.cell(row=fila_numeros, column=col_c)
+                        cell = ws_preg.cell(row=fila_numeros, column=col_c)
                         if type(cell).__name__ != "MergedCell":
                             cell.value = None
 
@@ -139,12 +145,12 @@ if lista_preguntas:
                     col_map = {5: 4, 4: 5, 3: 6, 2: 7, 1: 8}
                     target_col = col_map.get(val_elegido)
                     if target_col:
-                        target_cell = ws.cell(row=fila_numeros, column=target_col)
+                        target_cell = ws_preg.cell(row=fila_numeros, column=target_col)
                         if type(target_cell).__name__ != "MergedCell":
                             target_cell.value = "X"
 
-                    # Alimentar el valor numérico directo en la columna O para activar las fórmulas de subdimensiones y gráficas
-                    cell_o = ws.cell(row=fila_numeros, column=15)
+                    # Alimentar el valor numérico en la columna O para activar las fórmulas de subdimensiones y gráficas
+                    cell_o = ws_preg.cell(row=fila_numeros, column=15)
                     if type(cell_o).__name__ != "MergedCell":
                         cell_o.value = val_elegido
 
@@ -155,9 +161,7 @@ if lista_preguntas:
                 # --- CONFIGURACIÓN DE ENVÍO EXCLUSIVO AL ADMINISTRADOR ---
                 remitente = st.secrets["email"]["remitente"]
                 password = st.secrets["email"]["password_app"]
-                
-                # EL CORREO SE ENVÍA ÚNICAMENTE A TU BANDEJA (CONFIGURADO EN SECRETS)
-                correo_receptor = st.secrets["email"]["correo_destino"]
+                correo_receptor = st.secrets["email"]["correo_destino"]  # Tu correo configurado
 
                 msg = MIMEMultipart()
                 msg["From"] = remitente
@@ -172,7 +176,7 @@ if lista_preguntas:
                     f"- Edad: {edad}\n"
                     f"- Municipio: {municipio}\n"
                     f"- Correo de contacto del usuario: {correo_destino}\n\n"
-                    f"Adjunto encontrarás el archivo de Excel completo con los cálculos de dimensiones, subdimensiones y la hoja de gráfica generada automáticamente."
+                    f"Adjunto encontrarás el archivo de Excel completo con los datos del candidato, cálculos de dimensiones, subdimensiones y la hoja de gráfica generada automáticamente."
                 )
                 msg.attach(MIMEText(cuerpo, "plain"))
 
@@ -194,7 +198,7 @@ if lista_preguntas:
                 server.quit()
 
                 st.success(
-                    "¡Cuestionario enviado con éxito! Sus respuestas han sido procesadas y los resultados se han remitido de forma privada al administrador."
+                    "¡Cuestionario enviado con éxito! Sus respuestas han sido procesadas y los resultados se han remitido de forma privada a su bandeja."
                 )
                 st.balloons()
 
