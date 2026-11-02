@@ -114,22 +114,25 @@ if lista_preguntas:
                 escribir_celda(ws_preg, "H7", municipio)
                 escribir_celda(ws_preg, "H8", edad)
 
+                # Mapeo exacto del género (1 = Masculino, 2 = Femenino, 3 = Otro) para los baremos de la plantilla
                 genero_map = {"Masculino": 1, "Femenino": 2, "Otro": 3}
                 val_genero_idx = genero_map.get(genero, 1)
+                
+                # Asignar el índice numérico en N6 (clave para que los cálculos reconozcan el género) y el texto en K7
                 escribir_celda(ws_preg, "N6", val_genero_idx)
                 escribir_celda(ws_preg, "K7", genero)
 
-                # --- 2. VACIADO EN HOJA "PD con plantilla" (para que los datos aparezcan reflejados en todo el reporte) ---
+                # --- 2. VACIADO EN HOJA "PD con plantilla" ---
                 if "PD con plantilla" in wb.sheetnames:
                     ws_pd = wb["PD con plantilla"]
                     escribir_celda(ws_pd, "C6", nombre)
                     escribir_celda(ws_pd, "C7", ocupacion)
                     escribir_celda(ws_pd, "C8", str(fecha))
                     escribir_celda(ws_pd, "E8", municipio)
-                    escribir_celda(ws_pd, "C9", genero)
+                    escribir_celda(ws_pd, "C9", genero)  # Reflejar el texto del género seleccionado
                     escribir_celda(ws_pd, "E9", edad)
 
-                # Inyectar respuestas exclusivamente en las filas de preguntas (evitando errores en instrucciones)
+                # Inyectar respuestas exclusivamente en las filas de preguntas
                 for p in lista_preguntas:
                     row_idx = p["row"] + 1
                     val_elegido = st.session_state[p["id"]]
@@ -175,6 +178,7 @@ if lista_preguntas:
                     f"- Ocupación: {ocupacion}\n"
                     f"- Edad: {edad}\n"
                     f"- Municipio: {municipio}\n"
+                    f"- Género: {genero}\n"
                     f"- Correo de contacto del usuario: {correo_destino}\n\n"
                     f"Adjunto encontrarás el archivo de Excel completo con los datos del candidato, cálculos de dimensiones, subdimensiones y la hoja de gráfica generada automáticamente."
                 )
