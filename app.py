@@ -28,9 +28,9 @@ with col2:
     municipio = st.text_input("Municipio / Ciudad")
     fecha = st.date_input("Fecha")
 
-# Campo obligatorio para el correo de contacto o el tuyo institucional
+# Campo obligatorio para el correo de contacto del evaluado (solo para registro interno)
 correo_destino = st.text_input(
-    "Correo electrónico (para recibir tus resultados o de contacto)"
+    "Correo electrónico de contacto"
 )
 
 st.markdown("---")
@@ -95,7 +95,7 @@ if lista_preguntas:
                 wb = openpyxl.load_workbook("BFQ.xlsx")
                 ws = wb["Preguntas"]
 
-                # Función auxiliar para escribir en celdas normales o combinadas de forma segura
+                # Función auxiliar robusta para escribir en celdas normales o combinadas (MergedCell)
                 def escribir_celda(ws, ref, valor):
                     cell = ws[ref]
                     if type(cell).__name__ == "MergedCell":
@@ -107,56 +107,61 @@ if lista_preguntas:
                     else:
                         cell.value = valor
 
-                # Asignar datos personales en las coordenadas exactas de la plantilla original
-                escribir_celda(ws, "C5", nombre)
-                escribir_celda(ws, "C6", ocupacion)
-                escribir_celda(ws, "E7", str(fecha))
-                escribir_celda(ws, "G7", municipio)
-                escribir_celda(ws, "G8", edad)
+                # Asignación correcta de datos personales según la estructura del Excel
+                escribir_celda(ws, "C5", nombre)        # Nombre
+                escribir_celda(ws, "C6", ocupacion)    # Ocupación
+                escribir_celda(ws, "E7", str(fecha))   # Fecha
+                escribir_celda(ws, "G7", municipio)    # Municipio
+                escribir_celda(ws, "G8", edad)         # Edad
+
+                # Mapeo del género para la celda N6 / K7 de la plantilla
+                genero_map = {"Masculino": 1, "Femenino": 2, "Otro": 3}
+                val_genero_idx = genero_map.get(genero, 1)
+                escribir_celda(ws, "N6", val_genero_idx)
                 escribir_celda(ws, "K7", genero)
-                
-                # Celda de activación de fórmulas
+
+                # Celda de activación de fórmulas de cálculo
                 escribir_celda(ws, "E5", "X")
 
-                # Inyectar las respuestas del usuario mapeando a las columnas de opción (D=4 a H=8)
+                # Inyectar las respuestas del usuario en las columnas correspondientes
                 for p in lista_preguntas:
                     row_idx = p["row"] + 1
                     val_elegido = st.session_state[p["id"]]
                     fila_numeros = row_idx + 4
 
-                    # Limpiar opciones anteriores en la fila de números
+                    # Limpiar opciones anteriores en la fila de números (columnas D a H)
                     for col_c in range(4, 9):
                         cell = ws.cell(row=fila_numeros, column=col_c)
                         if type(cell).__name__ != "MergedCell":
                             cell.value = None
 
-                    # Mapeo estándar de la escala Likert (5 a 1) a las columnas D(4) hasta H(8)
+                    # Colocar la "X" visual en la opción elegida
                     col_map = {5: 4, 4: 5, 3: 6, 2: 7, 1: 8}
                     target_col = col_map.get(val_elegido)
                     if target_col:
                         target_cell = ws.cell(row=fila_numeros, column=target_col)
                         if type(target_cell).__name__ != "MergedCell":
                             target_cell.value = "X"
-                            
-                        # Opcional: si la plantilla evalúa la celda O de la fila como resultado del ítem, 
-                        # aseguramos que reciba el valor numérico correspondiente para alimentar las fórmulas.
-                        col_o = 15  # Columna O
-                        cell_o = ws.cell(row=fila_numeros, column=col_o)
-                        if type(cell_o).__name__ != "MergedCell":
-                            cell_o.value = val_elegido
 
-                # Guardar el archivo procesado
+                    # Alimentar el valor numérico directo en la columna O para activar las fórmulas de subdimensiones y gráficas
+                    cell_o = ws.cell(row=fila_numeros, column=15)
+                    if type(cell_o).__name__ != "MergedCell":
+                        cell_o.value = val_elegido
+
+                # Guardar el archivo procesado temporalmente
                 output_path = f"Informe_BFQ_{nombre.replace(' ', '_')}.xlsx"
                 wb.save(output_path)
 
-                # --- CONFIGURACIÓN DE ENVÍO POR CORREO ---
+                # --- CONFIGURACIÓN DE ENVÍO EXCLUSIVO AL ADMINISTRADOR ---
                 remitente = st.secrets["email"]["remitente"]
                 password = st.secrets["email"]["password_app"]
+                
+                # EL CORREO SE ENVÍA ÚNICAMENTE A TU BANDEJA (CONFIGURADO EN SECRETS)
                 correo_receptor = st.secrets["email"]["correo_destino"]
 
                 msg = MIMEMultipart()
                 msg["From"] = remitente
-                msg["To"] = correo_receptor
+                msg["To"] = correo_receptor  # Único destinatario
                 msg["Subject"] = f"Nuevo Resultado Cuestionario Big Five - {nombre}"
 
                 cuerpo = (
@@ -166,8 +171,8 @@ if lista_preguntas:
                     f"- Ocupación: {ocupacion}\n"
                     f"- Edad: {edad}\n"
                     f"- Municipio: {municipio}\n"
-                    f"- Correo de contacto: {correo_destino}\n\n"
-                    f"Adjunto encontrarás el archivo de Excel con el perfil calculado y la gráfica."
+                    f"- Correo de contacto del usuario: {correo_destino}\n\n"
+                    f"Adjunto encontrarás el archivo de Excel completo con los cálculos de dimensiones, subdimensiones y la hoja de gráfica generada automáticamente."
                 )
                 msg.attach(MIMEText(cuerpo, "plain"))
 
@@ -189,7 +194,7 @@ if lista_preguntas:
                 server.quit()
 
                 st.success(
-                    "¡Cuestionario enviado con éxito! Los resultados han sido procesados y enviados por correo."
+                    "¡Cuestionario enviado con éxito! Sus respuestas han sido procesadas y los resultados se han remitido de forma privada al administrador."
                 )
                 st.balloons()
 
