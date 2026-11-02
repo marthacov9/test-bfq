@@ -114,10 +114,17 @@ if lista_preguntas:
                 escribir_celda(ws_preg, "H7", municipio)
                 escribir_celda(ws_preg, "H8", edad)
 
-                # Mapeo corregido de género para que la hoja Grafica reconozca correctamente Masculino(2) / Femenino(3)
-                genero_map = {"Masculino": 2, "Femenino": 3, "Otro": 1}
-                val_genero_idx = genero_map.get(genero, 2)
-                
+                # Mapeo y asignación correcta del género en la hoja Preguntas (N6 para fórmulas y K6/K7 para texto visual)
+                if genero == "Masculino":
+                    val_genero_idx = 2
+                    escribir_celda(ws_preg, "K6", "Masculino")
+                elif genero == "Femenino":
+                    val_genero_idx = 3
+                    escribir_celda(ws_preg, "K6", "Femenino")
+                else:
+                    val_genero_idx = 1
+                    escribir_celda(ws_preg, "K6", "Otro")
+
                 escribir_celda(ws_preg, "N6", val_genero_idx)
                 escribir_celda(ws_preg, "K7", genero)
 
@@ -179,7 +186,7 @@ if lista_preguntas:
                     f"- Municipio: {municipio}\n"
                     f"- Género: {genero}\n"
                     f"- Correo de contacto del usuario: {correo_destino}\n\n"
-                    f"Adjunto encontrarás el archivo de Excel completo con los datos del candidato, cálculos correctos según el género, subdimensiones y la hoja de gráfica generada automáticamente."
+                    f"Adjunto encontrarás el archivo de Excel completo con los datos del candidato, cálculos de dimensiones y subdimensiones según el género, y la hoja de gráfica generada automáticamente."
                 )
                 msg.attach(MIMEText(cuerpo, "plain"))
 
