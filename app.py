@@ -95,35 +95,45 @@ if lista_preguntas:
                 wb = openpyxl.load_workbook("BFQ.xlsx")
                 ws = wb["Preguntas"]
 
-                # Datos personales en la hoja Preguntas
-                ws["C4"] = nombre
-                ws["C5"] = ocupacion
-                ws["C6"] = str(fecha)
-                ws["F6"] = municipio
-                ws["H5"] = genero
-                ws["F7"] = edad
+                # Función segura para escribir en celdas que puedan estar combinadas
+                def escribir_celda(ws, ref, valor):
+                    cell = ws[ref]
+                    # Si es parte de un rango combinado, buscamos la celda principal (topLeft)
+                    if type(cell).__name__ == "MergedCell":
+                        for merged_range in ws.merged_cells.ranges:
+                            if ref in merged_range:
+                                min_col, min_row, _, _ = merged_range.bounds
+                                ws.cell(row=min_row, column=min_col).value = valor
+                                return
+                    else:
+                        cell.value = valor
 
-                # Inyectar las respuestas evitando celdas combinadas (MergedCell)
+                # Asignar datos personales de forma segura
+                escribir_celda(ws, "C4", nombre)
+                escribir_celda(ws, "C5", ocupacion)
+                escribir_celda(ws, "C6", str(fecha))
+                escribir_celda(ws, "F6", municipio)
+                escribir_celda(ws, "H5", genero)
+                escribir_celda(ws, "F7", edad)
+
+                # Inyectar las respuestas del usuario
                 for p in lista_preguntas:
-                    row_idx = p["row"] + 1  # Fila donde está el identificador Px
+                    row_idx = p["row"] + 1
                     val_elegido = st.session_state[p["id"]]
-
-                    # En la estructura nueva, las filas de números (5, 4, 3, 2, 1) están 4 filas más abajo (ej: P1 en fila 28, números en fila 32)
                     fila_numeros = row_idx + 4
 
-                    # Limpiar las celdas de las columnas de respuesta (columnas 4 a 8, es decir D a H)
+                    # Limpiar opciones anteriores en la fila de números
                     for col_c in range(4, 9):
                         cell = ws.cell(row=fila_numeros, column=col_c)
-                        # Verificamos si es celda combinada para no modificar celdas secundarias de forma directa
-                        if type(cell).__name__ != 'MergedCell':
+                        if type(cell).__name__ != "MergedCell":
                             cell.value = None
 
-                    # Mapeo de valores a columnas exactas en la fila de números
+                    # Colocar la "X" en la opción elegida
                     col_map = {5: 4, 4: 5, 3: 6, 2: 7, 1: 8}
                     target_col = col_map.get(val_elegido)
                     if target_col:
                         target_cell = ws.cell(row=fila_numeros, column=target_col)
-                        if type(target_cell).__name__ != 'MergedCell':
+                        if type(target_cell).__name__ != "MergedCell":
                             target_cell.value = "X"
 
                 # Guardar el archivo procesado
