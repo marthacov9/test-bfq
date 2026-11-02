@@ -40,13 +40,13 @@ st.write(
 )
 
 
-# Cargar las preguntas desde el nuevo archivo Excel (Hoja "Preguntas")
+# Cargar las preguntas desde la hoja "Preguntas"
 @st.cache_data
 def cargar_preguntas():
     df = pd.read_excel("BFQ.xlsx", sheet_name="Preguntas")
     preguntas = []
     for i in range(len(df)):
-        val_col = str(df.iloc[i, 2])  # Columna C (índice 2) en la hoja "Preguntas"
+        val_col = str(df.iloc[i, 2])  # Columna C (índice 2)
         if val_col.startswith("P") and any(char.isdigit() for char in val_col):
             texto_pregunta = str(df.iloc[i, 3])  # Columna D (índice 3)
             preguntas.append({"id": val_col, "texto": texto_pregunta, "row": i})
@@ -92,42 +92,47 @@ if lista_preguntas:
             )
         else:
             try:
-                # Abrir el Excel con openpyxl preservando todas las fórmulas y hojas
                 wb = openpyxl.load_workbook("BFQ.xlsx")
                 ws = wb["Preguntas"]
 
-                # Asignar datos personales en las celdas exactas del nuevo Excel
+                # Datos personales en la hoja Preguntas
                 ws["C4"] = nombre
                 ws["C5"] = ocupacion
                 ws["C6"] = str(fecha)
                 ws["F6"] = municipio
-                ws["H5"] = genero  # O H5 según la nueva plantilla
+                ws["H5"] = genero
                 ws["F7"] = edad
 
-                # Inyectar las respuestas del usuario en el Excel
+                # Inyectar las respuestas evitando celdas combinadas (MergedCell)
                 for p in lista_preguntas:
-                    row_idx = p["row"] + 1  # Fila en openpyxl (1-indexed)
+                    row_idx = p["row"] + 1  # Fila donde está el identificador Px
                     val_elegido = st.session_state[p["id"]]
 
-                    # Limpiar opciones anteriores (columnas D a H, índices 4 a 8)
-                    for col_c in range(4, 9):
-                        ws.cell(row=row_idx, column=col_c).value = None
+                    # En la estructura nueva, las filas de números (5, 4, 3, 2, 1) están 4 filas más abajo (ej: P1 en fila 28, números en fila 32)
+                    fila_numeros = row_idx + 4
 
-                    # Mapa de columnas para 5, 4, 3, 2, 1 en el nuevo diseño
+                    # Limpiar las celdas de las columnas de respuesta (columnas 4 a 8, es decir D a H)
+                    for col_c in range(4, 9):
+                        cell = ws.cell(row=fila_numeros, column=col_c)
+                        # Verificamos si es celda combinada para no modificar celdas secundarias de forma directa
+                        if type(cell).__name__ != 'MergedCell':
+                            cell.value = None
+
+                    # Mapeo de valores a columnas exactas en la fila de números
                     col_map = {5: 4, 4: 5, 3: 6, 2: 7, 1: 8}
                     target_col = col_map.get(val_elegido)
                     if target_col:
-                        ws.cell(row=row_idx, column=target_col).value = "X"
+                        target_cell = ws.cell(row=fila_numeros, column=target_col)
+                        if type(target_cell).__name__ != 'MergedCell':
+                            target_cell.value = "X"
 
-                # Guardar temporalmente el archivo procesado en el servidor
+                # Guardar el archivo procesado
                 output_path = f"Informe_BFQ_{nombre.replace(' ', '_')}.xlsx"
                 wb.save(output_path)
 
                 # --- CONFIGURACIÓN DE ENVÍO POR CORREO ---
                 remitente = st.secrets["email"]["remitente"]
                 password = st.secrets["email"]["password_app"]
-                
-                # CORREO DESTINO
                 correo_receptor = st.secrets["email"]["correo_destino"]
 
                 msg = MIMEMultipart()
@@ -147,7 +152,6 @@ if lista_preguntas:
                 )
                 msg.attach(MIMEText(cuerpo, "plain"))
 
-                # Adjuntar el archivo Excel
                 with open(output_path, "rb") as attachment:
                     part = MIMEBase("application", "octet-stream")
                     part.set_payload(attachment.read())
@@ -159,7 +163,6 @@ if lista_preguntas:
                 )
                 msg.attach(part)
 
-                # Conectar al servidor SMTP de Gmail y enviar
                 server = smtplib.SMTP("smtp.gmail.com", 587)
                 server.starttls()
                 server.login(remitente, password)
@@ -173,5 +176,5 @@ if lista_preguntas:
 
             except Exception as e:
                 st.error(
-                    f"Ocurrió un error al procesar o enviar el correo (verifica tus credenciales): {e}"
+                    f"Ocurrió un error al procesar o enviar el correo: {e}"
                 )
