@@ -40,18 +40,16 @@ st.write(
 )
 
 
-# Cargar las preguntas desde el Excel original de manera precisa
+# Cargar las preguntas desde el nuevo archivo Excel (Hoja "Preguntas")
 @st.cache_data
 def cargar_preguntas():
-    df = pd.read_excel("BFQ.xlsx", sheet_name="Hoja 1")
+    df = pd.read_excel("BFQ.xlsx", sheet_name="Preguntas")
     preguntas = []
     for i in range(len(df)):
-        val_col1 = str(df.iloc[i, 1])  # Columna B (índice 1)
-        if val_col1.startswith("P") and any(
-            char.isdigit() for char in val_col1
-        ):
-            texto_pregunta = str(df.iloc[i, 2])  # Columna C (índice 2)
-            preguntas.append({"id": val_col1, "texto": texto_pregunta, "row": i})
+        val_col = str(df.iloc[i, 2])  # Columna C (índice 2) en la hoja "Preguntas"
+        if val_col.startswith("P") and any(char.isdigit() for char in val_col):
+            texto_pregunta = str(df.iloc[i, 3])  # Columna D (índice 3)
+            preguntas.append({"id": val_col, "texto": texto_pregunta, "row": i})
     return preguntas
 
 
@@ -94,30 +92,32 @@ if lista_preguntas:
             )
         else:
             try:
-                # Abrir el Excel con openpyxl preservando todas las fórmulas de la Hoja 2
+                # Abrir el Excel con openpyxl preservando todas las fórmulas y hojas
                 wb = openpyxl.load_workbook("BFQ.xlsx")
-                ws = wb["Hoja 1"]
+                ws = wb["Preguntas"]
 
-                # Asignar datos personales en las celdas exactas de tu Excel
-                ws["B5"] = nombre
-                ws["B6"] = ocupacion
-                ws["D7"] = str(fecha)
-                ws["F7"] = municipio
-                ws["B8"] = genero
-                ws["F8"] = edad
+                # Asignar datos personales en las celdas exactas del nuevo Excel
+                ws["C4"] = nombre
+                ws["C5"] = ocupacion
+                ws["C6"] = str(fecha)
+                ws["F6"] = municipio
+                ws["H5"] = genero  # O H5 según la nueva plantilla
+                ws["F7"] = edad
 
                 # Inyectar las respuestas del usuario en el Excel
                 for p in lista_preguntas:
-                    row_idx = p["row"] + 1
+                    row_idx = p["row"] + 1  # Fila en openpyxl (1-indexed)
                     val_elegido = st.session_state[p["id"]]
 
-                    for col_c in range(3, 8):
-                        ws.cell(row=row_idx + 4, column=col_c).value = None
+                    # Limpiar opciones anteriores (columnas D a H, índices 4 a 8)
+                    for col_c in range(4, 9):
+                        ws.cell(row=row_idx, column=col_c).value = None
 
-                    col_map = {5: 3, 4: 4, 3: 5, 2: 6, 1: 7}
+                    # Mapa de columnas para 5, 4, 3, 2, 1 en el nuevo diseño
+                    col_map = {5: 4, 4: 5, 3: 6, 2: 7, 1: 8}
                     target_col = col_map.get(val_elegido)
                     if target_col:
-                        ws.cell(row=row_idx + 4, column=target_col).value = "X"
+                        ws.cell(row=row_idx, column=target_col).value = "X"
 
                 # Guardar temporalmente el archivo procesado en el servidor
                 output_path = f"Informe_BFQ_{nombre.replace(' ', '_')}.xlsx"
@@ -127,8 +127,7 @@ if lista_preguntas:
                 remitente = st.secrets["email"]["remitente"]
                 password = st.secrets["email"]["password_app"]
                 
-                # CORREO DESTINO: 
-                # Apunta a tu correo fijo de administración configurado en los secrets
+                # CORREO DESTINO
                 correo_receptor = st.secrets["email"]["correo_destino"]
 
                 msg = MIMEMultipart()
@@ -148,7 +147,7 @@ if lista_preguntas:
                 )
                 msg.attach(MIMEText(cuerpo, "plain"))
 
-                # Adjuntar el archivo Excel (Error de sintaxis corregido correctamente)
+                # Adjuntar el archivo Excel
                 with open(output_path, "rb") as attachment:
                     part = MIMEBase("application", "octet-stream")
                     part.set_payload(attachment.read())
@@ -174,5 +173,5 @@ if lista_preguntas:
 
             except Exception as e:
                 st.error(
-                    f"Ocurrió un error al procesar o enviar el correo (verifica tus credenciales de correo): {e}"
+                    f"Ocurrió un error al procesar o enviar el correo (verifica tus credenciales): {e}"
                 )
