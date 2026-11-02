@@ -114,11 +114,10 @@ if lista_preguntas:
                 escribir_celda(ws_preg, "H7", municipio)
                 escribir_celda(ws_preg, "H8", edad)
 
-                # Mapeo exacto del género (1 = Masculino, 2 = Femenino, 3 = Otro) para los baremos de la plantilla
-                genero_map = {"Masculino": 1, "Femenino": 2, "Otro": 3}
-                val_genero_idx = genero_map.get(genero, 1)
+                # Mapeo corregido de género para que la hoja Grafica reconozca correctamente Masculino(2) / Femenino(3)
+                genero_map = {"Masculino": 2, "Femenino": 3, "Otro": 1}
+                val_genero_idx = genero_map.get(genero, 2)
                 
-                # Asignar el índice numérico en N6 (clave para que los cálculos reconozcan el género) y el texto en K7
                 escribir_celda(ws_preg, "N6", val_genero_idx)
                 escribir_celda(ws_preg, "K7", genero)
 
@@ -129,7 +128,7 @@ if lista_preguntas:
                     escribir_celda(ws_pd, "C7", ocupacion)
                     escribir_celda(ws_pd, "C8", str(fecha))
                     escribir_celda(ws_pd, "E8", municipio)
-                    escribir_celda(ws_pd, "C9", genero)  # Reflejar el texto del género seleccionado
+                    escribir_celda(ws_pd, "C9", genero)
                     escribir_celda(ws_pd, "E9", edad)
 
                 # Inyectar respuestas exclusivamente en las filas de preguntas
@@ -180,7 +179,7 @@ if lista_preguntas:
                     f"- Municipio: {municipio}\n"
                     f"- Género: {genero}\n"
                     f"- Correo de contacto del usuario: {correo_destino}\n\n"
-                    f"Adjunto encontrarás el archivo de Excel completo con los datos del candidato, cálculos de dimensiones, subdimensiones y la hoja de gráfica generada automáticamente."
+                    f"Adjunto encontrarás el archivo de Excel completo con los datos del candidato, cálculos correctos según el género, subdimensiones y la hoja de gráfica generada automáticamente."
                 )
                 msg.attach(MIMEText(cuerpo, "plain"))
 
