@@ -113,12 +113,12 @@ if lista_preguntas:
                 escribir_celda(ws, "E7", str(fecha))
                 escribir_celda(ws, "G7", municipio)
                 escribir_celda(ws, "G8", edad)
-                escribir_celda(ws, "K7", genero)  # Celda de selección de género
-
-                # Asignar un valor de activación en E5 para que las fórmulas de PD reconozcan que el test fue respondido
+                escribir_celda(ws, "K7", genero)
+                
+                # Celda de activación de fórmulas
                 escribir_celda(ws, "E5", "X")
 
-                # Inyectar las respuestas del usuario
+                # Inyectar las respuestas del usuario mapeando a las columnas de opción (D=4 a H=8)
                 for p in lista_preguntas:
                     row_idx = p["row"] + 1
                     val_elegido = st.session_state[p["id"]]
@@ -130,13 +130,20 @@ if lista_preguntas:
                         if type(cell).__name__ != "MergedCell":
                             cell.value = None
 
-                    # Colocar la "X" en la opción elegida (Columnas D a H)
+                    # Mapeo estándar de la escala Likert (5 a 1) a las columnas D(4) hasta H(8)
                     col_map = {5: 4, 4: 5, 3: 6, 2: 7, 1: 8}
                     target_col = col_map.get(val_elegido)
                     if target_col:
                         target_cell = ws.cell(row=fila_numeros, column=target_col)
                         if type(target_cell).__name__ != "MergedCell":
                             target_cell.value = "X"
+                            
+                        # Opcional: si la plantilla evalúa la celda O de la fila como resultado del ítem, 
+                        # aseguramos que reciba el valor numérico correspondiente para alimentar las fórmulas.
+                        col_o = 15  # Columna O
+                        cell_o = ws.cell(row=fila_numeros, column=col_o)
+                        if type(cell_o).__name__ != "MergedCell":
+                            cell_o.value = val_elegido
 
                 # Guardar el archivo procesado
                 output_path = f"Informe_BFQ_{nombre.replace(' ', '_')}.xlsx"
